@@ -1,13 +1,17 @@
 // src/pages/Index.tsx (Complete Updated File)
 import { useState, useEffect } from 'react';
-import { collection, query, onSnapshot } from 'firebase/firestore';
-import { db, auth, initializeAuth } from '@/lib/firebase'; // <-- FIX: Removed getBasePath
-import { Loader2, Coffee, LogOut } from 'lucide-react'; // ⬅️ IMPORT LogOut
+import { collection, query, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { db, auth, initializeAuth } from '@/lib/firebase';
+import { Loader2, Coffee, LogOut, BellRing, Bell } from 'lucide-react'; // <-- Import Bell icons
 import AdminDashboard from '@/components/AdminDashboard';
-import OwnerDashboard from '@/components/OwnerDashboard';
+import OwnerDashboard, { type Alert } from '@/components/OwnerDashboard'; // <-- Import Alert type
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button'; // ⬅️ IMPORT Button
-import { signOut } from 'firebase/auth'; // ⬅️ IMPORT signOut
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge'; // <-- Import Badge
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'; // <-- Import Sheet
+import { Card, CardContent, CardTitle } from '@/components/ui/card'; // <-- Import Card
+import { signOut } from 'firebase/auth';
+import { toast } from 'sonner';
 
 interface Cafe {
   id: string;
@@ -25,12 +29,29 @@ const Index = () => {
   const [adminUserId, setAdminUserId] = useState<string | null>(null);
   const navigate = useNavigate();
 
+  // --- New state for alerts ---
+  const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [isAlertSheetOpen, setIsAlertSheetOpen] = useState(false);
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      // The auth.onAuthStateChanged listener below handles the redirection to /login
     } catch (error) {
       console.error('Logout failed:', error);
+    }
+  };
+
+  // --- New handler to dismiss alerts ---
+  const handleMarkAlertAsDone = async (alertId: string) => {
+    try {
+      const alertRef = doc(db, "requests", alertId);
+      await updateDoc(alertRef, {
+        status: 'done'
+      });
+      toast.info("Alert marked as done.");
+    } catch (error) {
+      console.error('Error updating alert:', error);
+      toast.error('Failed to update alert');
     }
   };
 
@@ -38,7 +59,7 @@ const Index = () => {
     let unsubscribeFirestore: (() => void) | undefined;
 
     const checkCafeOwnership = (userId: string) => {
-      const cafesPath = "cafes"; // <-- FIX: Root collection
+      const cafesPath = "cafes";
       const q = query(collection(db, cafesPath));
 
       unsubscribeFirestore = onSnapshot(q, (snapshot) => {
@@ -64,7 +85,6 @@ const Index = () => {
         
         const unsubscribeAuth = auth.onAuthStateChanged((user) => {
           if (user) {
-            // User is authenticated, proceed with role checks
             const storedAdminId = localStorage.getItem('pixelbay_admin_id');
             
             if (!storedAdminId) {
@@ -81,12 +101,10 @@ const Index = () => {
               checkCafeOwnership(user.uid);
             }
           } else {
-            // User is NOT logged in. Redirect directly to the login page.
             setIsAdmin(false);
             setUserCafe(null);
             setLoading(false);
             
-            // Redirect only if not already on the login page
             if (window.location.pathname !== '/login') {
               navigate('/login'); 
             }
@@ -123,13 +141,53 @@ const Index = () => {
     );
   }
 
-  // If loading is false but no user is found (i.e., successfully redirected to /login), return null.
   if (!auth.currentUser) {
     return null;
   }
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
+      
+      {/* --- New Alert Sheet --- */}
+      <Sheet open={isAlertSheetOpen} onOpenChange={setIsAlertSheetOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md flex flex-col">
+          <SheetHeader>
+            <SheetTitle className="text-2xl flex items-center gap-2">
+              <BellRing className="h-6 w-6" /> Live Alerts
+            </SheetTitle>
+          </SheetHeader>
+          
+          {alerts.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-muted-foreground">No new alerts.</p>
+            </div>
+          ) : (
+            <div className="space-y-4 mt-6">
+              {alerts.map((alert) => (
+                <Card key={alert.id} className="shadow-lg border-destructive/50 bg-destructive/5">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg text-destructive">
+                        Table {alert.tableId}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        Needs server assistance!
+                      </p>
+                    </div>
+                    <Button 
+                      variant="destructive"
+                      onClick={() => handleMarkAlertAsDone(alert.id)}
+                    >
+                      Mark as Done
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
       <header className="border-b bg-card shadow-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -142,10 +200,33 @@ const Index = () => {
                 </p>
               </div>
             </div>
-            <Button variant="outline" onClick={handleLogout}> {/* ⬅️ LOGOUT BUTTON */}
-              <LogOut className="h-4 w-4 mr-2" />
-              Logout
-            </Button>
+            
+            {/* --- Updated Header Buttons --- */}
+            <div className="flex items-center gap-2">
+              {!isAdmin && userCafe && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="relative text-destructive border-destructive/50 hover:bg-destructive/10"
+                  aria-label="Open alerts"
+                  onClick={() => setIsAlertSheetOpen(true)}
+                >
+                  <Bell className="h-5 w-5" />
+                  {alerts.length > 0 && (
+                    <Badge 
+                        className="absolute -top-1 -right-1 h-6 w-6 p-0 flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-xs font-bold"
+                    >
+                        {alerts.length}
+                    </Badge>
+                  )}
+                </Button>
+              )}
+              <Button variant="outline" onClick={handleLogout}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
+
           </div>
         </div>
       </header>
@@ -154,7 +235,8 @@ const Index = () => {
         {isAdmin ? (
           <AdminDashboard />
         ) : userCafe ? (
-          <OwnerDashboard userCafe={userCafe} />
+          // --- Pass the alert setter to the dashboard ---
+          <OwnerDashboard userCafe={userCafe} onAlertsChange={setAlerts} />
         ) : (
           <div className="text-center py-12">
             <Coffee className="h-16 w-16 text-muted-foreground mx-auto mb-4" />

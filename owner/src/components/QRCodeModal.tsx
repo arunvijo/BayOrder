@@ -24,7 +24,7 @@ const QRCodeModal = ({ cafe, onClose }: QRCodeModalProps) => {
 
   // 1. Get the Customer App's domain from an environment variable.
   // This must be set on the Vercel dashboard for your Management project.
-  const CUSTOMER_APP_URL = import.meta.env.VITE_CUSTOMER_APP_URL || 'http://localhost:8081'|| 'https://bay-order.vercel.app';
+  const CUSTOMER_APP_URL = import.meta.env.VITE_CUSTOMER_APP_URL || 'https://bay-order.vercel.app' ;
 
   return (
     <Dialog open={true} onOpenChange={onClose}>

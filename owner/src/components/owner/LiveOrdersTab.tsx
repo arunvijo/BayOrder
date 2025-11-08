@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label'; // <-- THIS IS THE FIX
-import { CheckCircle2, Clock, BellRing, Package, Hand } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { CheckCircle2, Clock, Package, Hand } from 'lucide-react'; // <-- BellRing removed
 import { toast } from 'sonner';
 
 // --- Types (from CustomerApp) ---
@@ -35,13 +35,6 @@ interface Order {
   createdAt: any;
 }
 
-// --- New type for Server Alerts ---
-interface Alert {
-  id: string;
-  tableId: string;
-  createdAt: any;
-}
-
 // --- Map for the new Select dropdown ---
 const STATUS_OPTIONS: { value: OrderStatus; label: string; icon: React.ElementType }[] = [
   { value: 'Pending', label: 'Pending', icon: Clock },
@@ -57,7 +50,7 @@ interface LiveOrdersTabProps {
 
 const LiveOrdersTab = ({ cafeId, tableStatus }: LiveOrdersTabProps) => {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
+  // const [alerts, setAlerts] = useState<Alert[]>([]); // <-- REMOVED
 
   // --- 1. Listener for Live Orders ---
   useEffect(() => {
@@ -80,25 +73,7 @@ const LiveOrdersTab = ({ cafeId, tableStatus }: LiveOrdersTabProps) => {
     return () => unsubscribe();
   }, [cafeId]);
 
-  // --- 2. New Listener for Alerts ---
-  useEffect(() => {
-    const q = query(
-      collection(db, "requests"),
-      where('cafeId', '==', cafeId),
-      where('status', '==', 'new'),
-      orderBy('createdAt', 'desc')
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const alertsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Alert));
-      setAlerts(alertsData);
-    });
-
-    return () => unsubscribe();
-  }, [cafeId]);
+  // --- 2. Listener for Alerts (REMOVED) ---
 
   // --- 3. Handler to update order status ---
   const handleUpdateOrderStatus = async (order: Order, newStatus: OrderStatus) => {
@@ -128,54 +103,12 @@ const LiveOrdersTab = ({ cafeId, tableStatus }: LiveOrdersTabProps) => {
     }
   };
 
-  // --- 4. Handler to dismiss alerts ---
-  const handleMarkAlertAsDone = async (alertId: string) => {
-    try {
-      const alertRef = doc(db, "requests", alertId);
-      await updateDoc(alertRef, {
-        status: 'done'
-      });
-      toast.info("Alert marked as done.");
-    } catch (error) {
-      console.error('Error updating alert:', error);
-      toast.error('Failed to update alert');
-    }
-  };
+  // --- 4. Handler to dismiss alerts (REMOVED) ---
 
   return (
     <div className="space-y-6">
 
-      {/* --- New Alerts Section --- */}
-      {alerts.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-2xl font-semibold flex items-center gap-2 text-destructive">
-            <BellRing className="h-6 w-6 animate-pulse" />
-            Live Alerts
-          </h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {alerts.map((alert) => (
-              <Card key={alert.id} className="shadow-lg border-destructive/50 bg-destructive/5">
-                <CardContent className="p-4 flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-lg text-destructive">
-                      Table {alert.tableId}
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Needs server assistance!
-                    </p>
-                  </div>
-                  <Button 
-                    variant="destructive"
-                    onClick={() => handleMarkAlertAsDone(alert.id)}
-                  >
-                    Mark as Done
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* --- New Alerts Section (REMOVED) --- */}
 
       {/* --- Table Status Section (No change) --- */}
       <Card className="shadow-elegant">

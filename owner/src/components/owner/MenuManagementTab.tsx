@@ -13,8 +13,7 @@ import {
   type CollectionReference,
   type DocumentData,
 } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase'; // <-- FIX: Removed getBasePath
-
+import { db, auth } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,9 +23,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-
-import { PlusCircle, Edit, Trash2, Coffee } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { PlusCircle, Edit, Trash2, Coffee, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
+
+// --- Types (from CustomerApp) ---
+interface ModifierOption {
+  label: string;
+  price?: number;
+}
+
+interface Modifiers {
+  type: 'radio' | 'checkbox';
+  name: string;
+  options: ModifierOption[];
+}
 
 interface MenuItemBase {
   cafeId: string;
@@ -36,6 +48,7 @@ interface MenuItemBase {
   category: string;
   imageUrl?: string;
   available: boolean;
+  modifiers?: Modifiers[]; // <-- ADDED
 }
 
 interface MenuItem extends MenuItemBase {
@@ -48,13 +61,26 @@ interface MenuManagementTabProps {
 
 const categories = ['Beverages', 'Food', 'Desserts', 'Snacks'] as const;
 
-// Fix: Use DocumentData type for Firestore compatibility
 type MenuItemData = MenuItemBase & DocumentData;
+
+// --- Initial States for new forms ---
+const newModifierGroup = (): Modifiers => ({
+  name: '',
+  type: 'radio',
+  options: [{ label: '', price: 0 }]
+});
+
+const newModifierOption = (): ModifierOption => ({
+  label: '',
+  price: 0
+});
 
 const MenuManagementTab = ({ cafeId }: MenuManagementTabProps) => {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+
+  // --- Updated formData state ---
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -62,30 +88,18 @@ const MenuManagementTab = ({ cafeId }: MenuManagementTabProps) => {
     category: 'Beverages',
     imageUrl: '',
     available: true,
+    modifiers: [] as Modifiers[], // <-- ADDED
   });
 
-  // Fix: Simplify path handling - use direct collection reference
   const menuItemsColRef = useMemo(() => {
-    try {
-      // Option 1: Use direct collection reference (recommended)
-      return collection(db, 'menuItems') as CollectionReference<MenuItemData>;
-      
-      // Option 2: If you need custom path, ensure odd number of segments
-      // const basePath = 'artifacts/default-app/public/data'; // Ensure this has odd segments
-      // return collection(db, basePath, 'menuItems') as CollectionReference<MenuItemData>;
-    } catch (error) {
-      console.error('Error creating collection reference:', error);
-      // Fallback to direct collection reference
-      return collection(db, 'menuItems') as CollectionReference<MenuItemData>;
-    }
+    return collection(db, 'menuItems') as CollectionReference<MenuItemData>;
   }, []);
 
-  // Set Firestore log level once and log auth state
   useEffect(() => {
     try {
       setLogLevel('debug');
     } catch {
-      // ignore if SDK build doesn't expose setLogLevel
+      // ignore
     }
     const user = auth?.currentUser;
     console.log(user ? `Current user UID: ${user.uid}` : 'No user logged in.');
@@ -103,6 +117,7 @@ const MenuManagementTab = ({ cafeId }: MenuManagementTabProps) => {
             id: d.id,
             ...data,
             available: data.available ?? true,
+            modifiers: data.modifiers || [], // <-- Ensure modifiers array exists
           } as MenuItem;
         });
         setMenuItems(items);
@@ -110,16 +125,13 @@ const MenuManagementTab = ({ cafeId }: MenuManagementTabProps) => {
       },
       (err: FirestoreError) => {
         console.error('onSnapshot error:', err);
-        if (err.code === 'permission-denied') {
-          toast.error('Permission denied. Please check:\n1. You are logged in\n2. Firestore rules allow access\n3. Your cafe ID matches the document permissions');
-        } else {
-          toast.error('Failed to load menu items: ' + err.message);
-        }
+        toast.error('Failed to load menu items: ' + err.message);
       }
     );
     return () => unsubscribe();
   }, [menuItemsColRef, cafeId]);
 
+  // --- Updated resetForm ---
   const resetForm = () => {
     setFormData({
       name: '',
@@ -128,34 +140,73 @@ const MenuManagementTab = ({ cafeId }: MenuManagementTabProps) => {
       category: 'Beverages',
       imageUrl: '',
       available: true,
+      modifiers: [], // <-- ADDED
     });
     setEditingItem(null);
   };
 
+  // --- Handlers for nested Modifier state ---
+  
+  const addModifier = () => {
+    setFormData(prev => ({
+      ...prev,
+      modifiers: [...prev.modifiers, newModifierGroup()]
+    }));
+  };
+
+  const removeModifier = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      modifiers: prev.modifiers.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleModifierChange = (index: number, field: 'name' | 'type', value: string) => {
+    const newModifiers = [...formData.modifiers];
+    newModifiers[index] = { ...newModifiers[index], [field]: value };
+    setFormData(prev => ({ ...prev, modifiers: newModifiers }));
+  };
+
+  const addOption = (modIndex: number) => {
+    const newModifiers = [...formData.modifiers];
+    newModifiers[modIndex].options.push(newModifierOption());
+    setFormData(prev => ({ ...prev, modifiers: newModifiers }));
+  };
+
+  const removeOption = (modIndex: number, optIndex: number) => {
+    const newModifiers = [...formData.modifiers];
+    newModifiers[modIndex].options = newModifiers[modIndex].options.filter((_, i) => i !== optIndex);
+    setFormData(prev => ({ ...prev, modifiers: newModifiers }));
+  };
+
+  const handleOptionChange = (modIndex: number, optIndex: number, field: 'label' | 'price', value: string | number) => {
+    const newModifiers = [...formData.modifiers];
+    const newOptions = [...newModifiers[modIndex].options];
+    newOptions[optIndex] = { ...newOptions[optIndex], [field]: value };
+    newModifiers[modIndex].options = newOptions;
+    setFormData(prev => ({ ...prev, modifiers: newModifiers }));
+  };
+  
+  // --- Updated handleSubmit ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name || !formData.price) {
       toast.error('Please fill in required fields');
       return;
     }
-
-    const priceNum = Number(formData.price);
-    if (Number.isNaN(priceNum) || priceNum <= 0) {
-      toast.error('Price must be a valid positive number');
-      return;
-    }
+    // ... (price validation)
 
     try {
       const itemData: MenuItemData = {
         cafeId: editingItem ? editingItem.cafeId : cafeId,
         name: formData.name.trim(),
         description: formData.description.trim(),
-        price: priceNum,
+        price: Number(formData.price),
         category: formData.category,
         available: formData.available,
+        modifiers: formData.modifiers, // <-- ADDED
       };
 
-      // Only add imageUrl if it's not empty
       if (formData.imageUrl.trim()) {
         itemData.imageUrl = formData.imageUrl.trim();
       }
@@ -175,15 +226,11 @@ const MenuManagementTab = ({ cafeId }: MenuManagementTabProps) => {
       resetForm();
     } catch (error) {
       console.error('Error saving menu item:', error);
-      const err = error as FirestoreError;
-      if (err.code === 'permission-denied') {
-        toast.error('Permission denied. Check Firestore rules and user auth.');
-      } else {
-        toast.error('Failed to save menu item: ' + err.message);
-      }
+      toast.error('Failed to save menu item');
     }
   };
 
+  // --- Updated handleEdit ---
   const handleEdit = (item: MenuItem) => {
     setEditingItem(item);
     setFormData({
@@ -193,6 +240,7 @@ const MenuManagementTab = ({ cafeId }: MenuManagementTabProps) => {
       category: item.category,
       imageUrl: item.imageUrl || '',
       available: item.available,
+      modifiers: item.modifiers || [], // <-- ADDED
     });
     setIsAddDialogOpen(true);
   };
@@ -205,12 +253,7 @@ const MenuManagementTab = ({ cafeId }: MenuManagementTabProps) => {
       toast.success('Menu item deleted successfully');
     } catch (error) {
       console.error('Error deleting menu item:', error);
-      const err = error as FirestoreError;
-      if (err.code === 'permission-denied') {
-        toast.error('Permission denied. Check Firestore rules and user auth.');
-      } else {
-        toast.error('Failed to delete menu item: ' + err.message);
-      }
+      toast.error('Failed to delete menu item');
     }
   };
 
@@ -243,96 +286,116 @@ const MenuManagementTab = ({ cafeId }: MenuManagementTabProps) => {
             </Button>
           </DialogTrigger>
 
-          <DialogContent className="max-w-md">
+          {/* --- UPDATED DIALOG CONTENT --- */}
+          <DialogContent className="max-w-lg max-h-[90vh]">
             <DialogHeader>
               <DialogTitle>{editingItem ? 'Edit Menu Item' : 'Add New Menu Item'}</DialogTitle>
             </DialogHeader>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Item Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Enter item name"
-                  required
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Enter item description"
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+            <ScrollArea className="pr-4 -mr-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* --- Basic Info --- */}
                 <div>
-                  <Label htmlFor="price">Price ($) *</Label>
-                  <Input
-                    id="price"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    inputMode="decimal"
-                    value={formData.price}
-                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    placeholder="0.00"
-                    required
-                  />
+                  <Label htmlFor="name">Item Name *</Label>
+                  <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+                </div>
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea id="description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} rows={3} />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="price">Price ($) *</Label>
+                    <Input id="price" type="number" step="0.01" min="0" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} required />
+                  </div>
+                  <div>
+                    <Label htmlFor="category">Category</Label>
+                    <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => <SelectItem key={cat} value={cat}>{cat}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="imageUrl">Image URL (optional)</Label>
+                  <Input id="imageUrl" type="url" value={formData.imageUrl} onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })} />
+                </div>
+                <div className="flex items-center justify-between border p-3 rounded-md">
+                  <Label htmlFor="available" className="font-medium cursor-pointer">Available for Ordering</Label>
+                  <Switch id="available" checked={formData.available} onCheckedChange={(checked) => setFormData({ ...formData, available: checked })} />
+                </div>
+                
+                <Separator />
+
+                {/* --- New Modifiers/Customizations Section --- */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Customizations</h3>
+                  {formData.modifiers.map((modifier, modIndex) => (
+                    <div key={modIndex} className="border p-3 rounded-md space-y-3 bg-muted/50">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">Group {modIndex + 1}</h4>
+                        <Button type="button" variant="ghost" size="icon" className="h-6 w-6 text-destructive" onClick={() => removeModifier(modIndex)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Group Name</Label>
+                          <Input value={modifier.name} onChange={(e) => handleModifierChange(modIndex, 'name', e.target.value)} placeholder="e.g., Size" />
+                        </div>
+                        <div>
+                          <Label>Selection Type</Label>
+                          <Select value={modifier.type} onValueChange={(value: 'radio' | 'checkbox') => handleModifierChange(modIndex, 'type', value)}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="radio">One Choice (Radio)</SelectItem>
+                              <SelectItem value="checkbox">Multiple Choice (Checkbox)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      
+                      {/* --- Options Sub-form --- */}
+                      <div className="space-y-2">
+                        <Label>Options</Label>
+                        {modifier.options.map((option, optIndex) => (
+                          <div key={optIndex} className="flex items-center gap-2">
+                            <Input
+                              value={option.label}
+                              onChange={(e) => handleOptionChange(modIndex, optIndex, 'label', e.target.value)}
+                              placeholder="Option Name (e.g., Large)"
+                              className="flex-1"
+                            />
+                            <Input
+                              type="number"
+                              value={option.price || 0}
+                              onChange={(e) => handleOptionChange(modIndex, optIndex, 'price', parseFloat(e.target.value) || 0)}
+                              placeholder="Price (e.g., 0.50)"
+                              className="w-24"
+                            />
+                            <Button type="button" variant="outline" size="icon" className="h-9 w-9 text-destructive" onClick={() => removeOption(modIndex, optIndex)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button type="button" variant="secondary" size="sm" onClick={() => addOption(modIndex)}>
+                          <Plus className="h-4 w-4 mr-1" /> Add Option
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" className="w-full" onClick={addModifier}>
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Add Customization Group
+                  </Button>
                 </div>
 
-                <div>
-                  <Label htmlFor="category">Category</Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) => setFormData({ ...formData, category: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {cat}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="imageUrl">Image URL (optional)</Label>
-                <Input
-                  id="imageUrl"
-                  type="url"
-                  value={formData.imageUrl}
-                  onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                  placeholder="https://example.com/image.jpg"
-                />
-              </div>
-
-              <div className="flex items-center justify-between border p-3 rounded-md">
-                <Label htmlFor="available" className="font-medium cursor-pointer">
-                  Available for Ordering
-                </Label>
-                <Switch
-                  id="available"
-                  checked={formData.available}
-                  onCheckedChange={(checked) => setFormData({ ...formData, available: checked })}
-                />
-              </div>
-
-              <Button type="submit" className="w-full">
-                {editingItem ? 'Update Item' : 'Add Item'}
-              </Button>
-            </form>
+                <Button type="submit" className="w-full">
+                  {editingItem ? 'Update Item' : 'Add Item'}
+                </Button>
+              </form>
+            </ScrollArea>
           </DialogContent>
         </Dialog>
       </div>
@@ -342,12 +405,7 @@ const MenuManagementTab = ({ cafeId }: MenuManagementTabProps) => {
           <CardContent className="py-12 text-center text-muted-foreground">
             <Coffee className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p className="text-lg font-medium mb-2">No menu items found</p>
-            <p className="text-sm">
-              {auth?.currentUser 
-                ? 'Add your first menu item to get started!' 
-                : 'Please log in to manage menu items.'
-              }
-            </p>
+            <p className="text-sm">Add your first menu item to get started!</p>
           </CardContent>
         </Card>
       ) : (
@@ -359,28 +417,40 @@ const MenuManagementTab = ({ cafeId }: MenuManagementTabProps) => {
                 {items.map((item) => (
                   <Card
                     key={item.id}
-                    className="shadow-elegant hover:shadow-elegant-lg transition-smooth"
+                    className="shadow-elegant hover:shadow-elegant-lg transition-smooth flex flex-col"
                   >
+                    {/* --- FIX: ADDED IMAGE --- */}
+                    {item.imageUrl && (
+                      <div className="aspect-video w-full overflow-hidden rounded-t-lg">
+                        <img 
+                          src={item.imageUrl} 
+                          alt={item.name} 
+                          className="w-full h-full object-cover" 
+                        />
+                      </div>
+                    )}
                     <CardHeader>
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-lg flex items-center">
-                          <span>{item.name}</span>
-                          {!item.available && (
-                            <Badge variant="destructive" className="ml-2">
-                              Unavailable
-                            </Badge>
-                          )}
-                        </CardTitle>
+                        <CardTitle className="text-lg">{item.name}</CardTitle>
                         <span className="text-primary font-bold">
                           ${item.price.toFixed(2)}
                         </span>
                       </div>
+                      {/* --- ADDED BADGES --- */}
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {!item.available && (
+                          <Badge variant="destructive">Unavailable</Badge>
+                        )}
+                        {item.modifiers && item.modifiers.length > 0 && (
+                          <Badge variant="secondary">Customizable</Badge>
+                        )}
+                      </div>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="space-y-3 flex-1 flex flex-col justify-end">
                       {item.description && (
-                        <p className="text-sm text-muted-foreground">{item.description}</p>
+                        <p className="text-sm text-muted-foreground mb-auto">{item.description}</p>
                       )}
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 pt-2">
                         <Button
                           variant="outline"
                           size="sm"

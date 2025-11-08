@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { auth } from '@/lib/firebase';
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LayoutDashboard, Menu, Settings } from 'lucide-react';
 import LiveOrdersTab from './owner/LiveOrdersTab';
 import MenuManagementTab from './owner/MenuManagementTab';
 import CafeSettingsTab from './owner/CafeSettingsTab';
+import { toast } from 'sonner';
 
 interface Cafe {
   id: string;
@@ -15,12 +17,42 @@ interface Cafe {
   tableStatus: Record<string, string>;
 }
 
-interface OwnerDashboardProps {
-  userCafe: Cafe;
+// New type for Server Alerts
+export interface Alert {
+  id: string;
+  tableId: string;
+  createdAt: any;
 }
 
-const OwnerDashboard = ({ userCafe }: OwnerDashboardProps) => {
+interface OwnerDashboardProps {
+  userCafe: Cafe;
+  // New prop to send alerts up to the header
+  onAlertsChange: (alerts: Alert[]) => void;
+}
+
+const OwnerDashboard = ({ userCafe, onAlertsChange }: OwnerDashboardProps) => {
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // --- Alert listener is MOVED here ---
+  useEffect(() => {
+    const q = query(
+      collection(db, "requests"),
+      where('cafeId', '==', userCafe.id),
+      where('status', '==', 'new'),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const alertsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Alert));
+      // Pass the alerts up to the Index.tsx header
+      onAlertsChange(alertsData);
+    });
+
+    return () => unsubscribe();
+  }, [userCafe.id, onAlertsChange]);
 
   return (
     <div className="space-y-6">
@@ -48,6 +80,7 @@ const OwnerDashboard = ({ userCafe }: OwnerDashboardProps) => {
         </TabsList>
 
         <TabsContent value="dashboard" className="mt-6">
+          {/* We pass the cafeId and tableStatus, but the alert logic is gone from this tab */}
           <LiveOrdersTab cafeId={userCafe.id} tableStatus={userCafe.tableStatus} />
         </TabsContent>
 

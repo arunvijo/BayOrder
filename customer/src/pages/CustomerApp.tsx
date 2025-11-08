@@ -44,14 +44,15 @@ interface Modifiers {
 }
 
 interface MenuItem {
-  id: string;
-  cafeId: string;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  available: boolean;
-  modifiers?: Modifiers[];
+  id: string;
+  cafeId: string;
+  name: string;
+  description: string;
+  price: number;
+  category: string;
+  available: boolean;
+  modifiers?: Modifiers[];
+  imageUrl?: string; // <-- ADD THIS LINE
 }
 
 interface Cafe {
@@ -713,31 +714,42 @@ const CustomerApp = () => {
                               <h2 className="text-2xl font-bold text-foreground mb-4 capitalize">
                                   {category}
                               </h2>
-                              <div className="grid gap-4">
+                              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                                   {items.map((item) => {
                                       // --- FIX (Request 2): Check if a simple version is in cart ---
                                       const simpleCartItem = (item.modifiers && item.modifiers.length > 0) ? null : simpleCartItemMap[item.id];
 
                                       return (
-                                          <Card key={item.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                                              <CardContent className="p-4">
-                                                  <div className="flex justify-between items-start gap-4">
-                                                      <div className="flex-1">
-                                                          <h3 className="font-semibold text-lg text-foreground mb-1">
-                                                              {item.name}
-                                                          </h3>
-                                                          <p className="text-sm text-muted-foreground mb-3">
-                                                              {item.description}
-                                                          </p>
-                                                          <p className="text-lg font-bold text-primary">
-                                                              ${item.price.toFixed(2)}
-                                                          </p>
-                                                      </div>
-                                                      
-                                                      {/* --- FIX (Request 2): Show counter or button --- */}
+                                          <Card key={item.id} className="overflow-hidden hover:shadow-md transition-shadow flex flex-col">
+                                              
+                                              {/* --- START OF NEW LAYOUT --- */}
+                                              {item.imageUrl && (
+                                                  <div className="aspect-video w-full overflow-hidden rounded-t-lg">
+                                                      <img 
+                                                          src={item.imageUrl} 
+                                                          alt={item.name} 
+                                                          className="w-full h-full object-cover" 
+                                                      />
+                                                  </div>
+                                              )}
+                                              <CardHeader>
+                                                  <div className="flex items-center justify-between">
+                                                      <CardTitle className="text-lg">{item.name}</CardTitle>
+                                                      <span className="text-lg font-bold text-primary">
+                                                          ${item.price.toFixed(2)}
+                                                      </span>
+                                                  </div>
+                                              </CardHeader>
+                                              <CardContent className="space-y-3 flex-1 flex flex-col justify-end">
+                                                  <p className="text-sm text-muted-foreground mb-auto">
+                                                      {item.description}
+                                                  </p>
+                                                  
+                                                  {/* --- Button/Counter now at the bottom --- */}
+                                                  <div className="pt-2">
                                                       {simpleCartItem ? (
                                                           // Show counter if simple item is in cart
-                                                          <div className="flex items-center gap-2">
+                                                          <div className="flex items-center gap-2 justify-end">
                                                               <Button
                                                                   variant="outline"
                                                                   size="sm"
@@ -761,16 +773,17 @@ const CustomerApp = () => {
                                                           <Button
                                                               onClick={() => handleAddItemClick(item)}
                                                               size="sm"
-                                                              className="shrink-0"
+                                                              className="w-full"
                                                           >
                                                               <Plus className="h-4 w-4 mr-1" />
                                                               {item.modifiers && item.modifiers.length > 0 ? 'Customize' : 'Add'}
                                                           </Button>
                                                       )}
-                                                      {/* --- End of Fix --- */}
-                                                      
                                                   </div>
+                                                  {/* --- End of Fix --- */}
                                               </CardContent>
+                                              {/* --- END OF NEW LAYOUT --- */}
+                                              
                                           </Card>
                                       );
                                   })}

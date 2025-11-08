@@ -154,3 +154,41 @@ All colors MUST be HSL.
     background: var(--gradient-subtle);
   }
 }
+
+
+@layer utilities {
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /*
+    Use these classes in your JSX to trigger the animation.
+    'will-change-transform' tells the browser to optimize for this.
+  */
+  .animate-fade-in-up {
+    opacity: 0; /* Start hidden */
+    animation: fade-in-up 0.6s ease-out forwards;
+    will-change: transform, opacity;
+  }
+
+  /* Staggered delay helpers */
+  .animation-delay-100 {
+    animation-delay: 100ms;
+  }
+  .animation-delay-200 {
+    animation-delay: 200ms;
+  }
+  .animation-delay-300 {
+    animation-delay: 300ms;
+  }
+  .animation-delay-400 {
+    animation-delay: 400ms;
+  }
+}
