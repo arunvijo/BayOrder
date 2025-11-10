@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LayoutDashboard, Menu, Settings } from 'lucide-react';
+import { LayoutDashboard, Menu, Settings, AreaChart } from 'lucide-react'; // <-- Import AreaChart
 import LiveOrdersTab from './owner/LiveOrdersTab';
 import MenuManagementTab from './owner/MenuManagementTab';
 import CafeSettingsTab from './owner/CafeSettingsTab';
-import { toast } from 'sonner';
+import AnalyticsTab from './owner/Analyticstab'; // <-- Import new AnalyticsTab
 
 interface Cafe {
   id: string;
@@ -22,6 +22,9 @@ export interface Alert {
   id: string;
   tableId: string;
   createdAt: any;
+  // Add other fields from your 'requests' doc if needed
+  cafeId?: string;
+  status?: string;
 }
 
 interface OwnerDashboardProps {
@@ -35,6 +38,8 @@ const OwnerDashboard = ({ userCafe, onAlertsChange }: OwnerDashboardProps) => {
 
   // --- Alert listener is MOVED here ---
   useEffect(() => {
+    if (!userCafe.id) return; // Add guard for userCafe
+    
     const q = query(
       collection(db, "requests"),
       where('cafeId', '==', userCafe.id),
@@ -64,11 +69,20 @@ const OwnerDashboard = ({ userCafe, onAlertsChange }: OwnerDashboardProps) => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
+        {/* --- UPDATED: grid-cols-4 --- */}
+        <TabsList className="grid w-full grid-cols-4 lg:w-auto">
           <TabsTrigger value="dashboard" className="flex items-center gap-2">
             <LayoutDashboard className="h-4 w-4" />
             <span className="hidden sm:inline">Dashboard</span>
           </TabsTrigger>
+          
+          {/* --- NEW TAB --- */}
+          <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <AreaChart className="h-4 w-4" />
+            <span className="hidden sm:inline">Analytics</span>
+          </TabsTrigger>
+          {/* --- END NEW TAB --- */}
+
           <TabsTrigger value="menu" className="flex items-center gap-2">
             <Menu className="h-4 w-4" />
             <span className="hidden sm:inline">Menu</span>
@@ -83,6 +97,12 @@ const OwnerDashboard = ({ userCafe, onAlertsChange }: OwnerDashboardProps) => {
           {/* We pass the cafeId and tableStatus, but the alert logic is gone from this tab */}
           <LiveOrdersTab cafeId={userCafe.id} tableStatus={userCafe.tableStatus} />
         </TabsContent>
+
+        {/* --- NEW TAB CONTENT --- */}
+        <TabsContent value="analytics" className="mt-6">
+          <AnalyticsTab cafeId={userCafe.id} />
+        </TabsContent>
+        {/* --- END NEW TAB CONTENT --- */}
 
         <TabsContent value="menu" className="mt-6">
           <MenuManagementTab cafeId={userCafe.id} />

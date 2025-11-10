@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Coffee, PlusCircle, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
-import QRCodeModal from './QRCodeModal';
+import QRCodeModal from './AdminQRCodeModal';
 
 interface Cafe {
   id: string;

@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth, signInWithCustomToken } from 'firebase/auth';
+import { getFunctions } from "firebase/functions";
 
 // Firebase configuration from Gemini global variables
 // const firebaseConfig = {
@@ -44,3 +45,5 @@ export const getAppId = () => (window as any).__app_id || 'default-app';
 
 // Get the base path for all data
 export const getBasePath = () => `/artifacts/${getAppId()}/public/data`;
+
+export const functions = getFunctions(app);
