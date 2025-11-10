@@ -6,7 +6,7 @@ import { LayoutDashboard, Menu, Settings, AreaChart } from 'lucide-react'; // <-
 import LiveOrdersTab from './owner/LiveOrdersTab';
 import MenuManagementTab from './owner/MenuManagementTab';
 import CafeSettingsTab from './owner/CafeSettingsTab';
-import AnalyticsTab from './owner/Analyticstab'; // <-- Import new AnalyticsTab
+import AnalyticsTab from './owner/AnalyticsTab'; // <-- Import new AnalyticsTab
 
 interface Cafe {
   id: string;
