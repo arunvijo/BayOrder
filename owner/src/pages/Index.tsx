@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db, auth, initializeAuth } from '@/lib/firebase';
-import { Loader2, Coffee, LogOut, BellRing, Bell } from 'lucide-react'; // <-- Import Bell icons
+import { Loader2, Store, LogOut, BellRing, Bell } from 'lucide-react'; // <-- Import Bell icons
 import AdminDashboard from '@/components/AdminDashboard';
 import OwnerDashboard, { type Alert } from '@/components/OwnerDashboard'; // <-- Import Alert type
 import { useNavigate } from 'react-router-dom';
@@ -131,7 +131,7 @@ const Index = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-subtle">
         <div className="text-center space-y-4">
-          <Coffee className="h-16 w-16 text-primary mx-auto animate-pulse" />
+          <Store className="h-16 w-16 text-primary mx-auto animate-pulse" />
           <div className="flex items-center gap-2 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
             <span>Loading BayOrder Dashboard...</span>
@@ -192,7 +192,7 @@ const Index = () => {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Coffee className="h-8 w-8 text-primary" />
+              <Store className="h-8 w-8 text-primary" />
               <div>
                 <h1 className="text-2xl font-bold">BayOrder</h1>
                 <p className="text-sm text-muted-foreground">
@@ -239,7 +239,7 @@ const Index = () => {
           <OwnerDashboard userCafe={userCafe} onAlertsChange={setAlerts} />
         ) : (
           <div className="text-center py-12">
-            <Coffee className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <Store className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
             <h2 className="text-2xl font-semibold mb-2">No Cafe Access</h2>
             <p className="text-muted-foreground">
               Your user account is logged in but not associated with a cafe. Please contact the administrator.
